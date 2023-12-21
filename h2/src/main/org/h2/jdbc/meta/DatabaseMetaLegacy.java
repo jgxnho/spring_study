@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -650,7 +650,8 @@ public final class DatabaseMetaLegacy extends DatabaseMetaLocalBase {
 
     private ResultInterface executeQuery(String sql, Value... args) {
         checkClosed();
-        synchronized (session) {
+        session.lock();
+        try {
             CommandInterface command = session.prepareCommand(sql, Integer.MAX_VALUE);
             int l = args.length;
             if (l > 0) {
@@ -662,6 +663,8 @@ public final class DatabaseMetaLegacy extends DatabaseMetaLocalBase {
             ResultInterface result = command.executeQuery(0, false);
             command.close();
             return result;
+        } finally {
+            session.unlock();
         }
     }
 

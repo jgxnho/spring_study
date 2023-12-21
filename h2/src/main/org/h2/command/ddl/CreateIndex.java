@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -11,6 +11,7 @@ import org.h2.engine.Constants;
 import org.h2.engine.Database;
 import org.h2.engine.Right;
 import org.h2.engine.SessionLocal;
+import org.h2.engine.NullsDistinct;
 import org.h2.index.IndexType;
 import org.h2.message.DbException;
 import org.h2.schema.Schema;
@@ -26,6 +27,7 @@ public class CreateIndex extends SchemaCommand {
     private String tableName;
     private String indexName;
     private IndexColumn[] indexColumns;
+    private NullsDistinct nullsDistinct;
     private int uniqueColumnCount;
     private boolean primaryKey, hash, spatial;
     private boolean ifTableExists;
@@ -58,7 +60,7 @@ public class CreateIndex extends SchemaCommand {
 
     @Override
     public long update() {
-        Database db = session.getDatabase();
+        Database db = getDatabase();
         boolean persistent = db.isPersistent();
         Table table = getSchema().findTableOrView(session, tableName);
         if (table == null) {
@@ -95,7 +97,7 @@ public class CreateIndex extends SchemaCommand {
             }
             indexType = IndexType.createPrimaryKey(persistent, hash);
         } else if (uniqueColumnCount > 0) {
-            indexType = IndexType.createUnique(persistent, hash);
+            indexType = IndexType.createUnique(persistent, hash, uniqueColumnCount, nullsDistinct);
         } else {
             indexType = IndexType.createNonUnique(persistent, hash, spatial);
         }
@@ -108,7 +110,8 @@ public class CreateIndex extends SchemaCommand {
         this.primaryKey = b;
     }
 
-    public void setUniqueColumnCount(int uniqueColumnCount) {
+    public void setUnique(NullsDistinct nullsDistinct, int uniqueColumnCount) {
+        this.nullsDistinct = nullsDistinct;
         this.uniqueColumnCount = uniqueColumnCount;
     }
 

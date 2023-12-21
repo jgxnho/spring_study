@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -330,7 +330,8 @@ public class DatabaseMetaRemote extends DatabaseMeta {
         if (session.isClosed()) {
             throw DbException.get(ErrorCode.DATABASE_CALLED_AT_SHUTDOWN);
         }
-        synchronized (session) {
+        session.lock();
+        try {
             int objectId = session.getNextId();
             for (int i = 0, count = 0; i < transferList.size(); i++) {
                 Transfer transfer = transferList.get(i);
@@ -349,6 +350,8 @@ public class DatabaseMetaRemote extends DatabaseMeta {
                 }
             }
             return null;
+        } finally {
+            session.unlock();
         }
     }
 

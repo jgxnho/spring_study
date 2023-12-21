@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -29,3 +29,15 @@ SELECT (1, 2).C;
 
 SELECT (1, 2).CX;
 > exception COLUMN_NOT_FOUND_1
+
+SELECT JSON '{"a": 4, "b": 5, "c": 6}'."b";
+>> 5
+
+SELECT JSON '{"a": 4, "b": {"x": 8, "y": 9}, "c": 6}'."b"."y";
+>> 9
+
+SELECT JSON '{"a": 4, "b": 5, "c": 6}'."d";
+>> null
+
+SELECT JSON '[1]'."d";
+>> null

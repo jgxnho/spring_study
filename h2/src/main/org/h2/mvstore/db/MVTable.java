@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -418,7 +418,7 @@ public class MVTable extends TableBase {
         long i = 0;
         Store store = session.getDatabase().getStore();
 
-        int bufferSize = database.getMaxMemoryRows() / 2;
+        int bufferSize = (int) Math.min(total, database.getMaxMemoryRows() / 2);
         ArrayList<Row> buffer = new ArrayList<>(bufferSize);
         String n = getName() + ':' + index.getName();
         ArrayList<String> bufferNames = Utils.newSmallArrayList();
@@ -551,8 +551,8 @@ public class MVTable extends TableBase {
     }
 
     @Override
-    public Row lockRow(SessionLocal session, Row row) {
-        Row lockedRow = primaryIndex.lockRow(session, row);
+    public Row lockRow(SessionLocal session, Row row, int timeoutMillis) {
+        Row lockedRow = primaryIndex.lockRow(session, row, timeoutMillis);
         if (lockedRow == null || !row.hasSharedData(lockedRow)) {
             syncLastModificationIdWithDatabase();
         }
@@ -675,14 +675,28 @@ public class MVTable extends TableBase {
      * @return the database exception
      */
     DbException convertException(MVStoreException e) {
+        return convertException(e, false);
+    }
+
+    /**
+     * Convert the MVStoreException from attempt to lock a row to a database
+     * exception.
+     *
+     * @param e the illegal state exception
+     * @return the database exception
+     */
+    DbException convertLockException(MVStoreException e) {
+        return convertException(e, true);
+    }
+
+    private DbException convertException(MVStoreException e, boolean lockException) {
         int errorCode = e.getErrorCode();
         if (errorCode == DataUtils.ERROR_TRANSACTION_LOCKED) {
-            throw DbException.get(ErrorCode.CONCURRENT_UPDATE_1,
+            return DbException.get(lockException ? ErrorCode.LOCK_TIMEOUT_1 : ErrorCode.CONCURRENT_UPDATE_1,
                     e, getName());
         }
         if (errorCode == DataUtils.ERROR_TRANSACTIONS_DEADLOCK) {
-            throw DbException.get(ErrorCode.DEADLOCK_1,
-                    e, getName());
+            return DbException.get(ErrorCode.DEADLOCK_1, e, getName());
         }
         return store.convertMVStoreException(e);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -136,7 +136,7 @@ public class TestPgServer extends TestDb {
             Connection conn = DriverManager.getConnection(
                     "jdbc:postgresql://localhost:5535/pgserver", "sa", "sa");
             Statement stat = conn.createStatement();
-            stat.execute("create alias sleep for 'java.lang.Thread.sleep'");
+            stat.execute("create alias sleep for 'java.lang.Thread.sleep(long)'");
 
             // create a table with 200 rows (cancel interval is 127)
             stat.execute("create table test(id int)");

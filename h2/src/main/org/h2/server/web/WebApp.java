@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.h2.api.ErrorCode;
 import org.h2.bnf.Bnf;
@@ -38,7 +39,7 @@ import org.h2.bnf.context.DbColumn;
 import org.h2.bnf.context.DbContents;
 import org.h2.bnf.context.DbSchema;
 import org.h2.bnf.context.DbTableOrView;
-import org.h2.command.Parser;
+import org.h2.command.ParserBase;
 import org.h2.engine.Constants;
 import org.h2.engine.SysProperties;
 import org.h2.jdbc.JdbcException;
@@ -679,11 +680,12 @@ public class WebApp {
             if (prep != null) {
                 prep.setString(1, schema.name);
             }
+            AtomicReference<PreparedStatement> prepRef = new AtomicReference<>(prep);
             if (schema.isSystem) {
                 Arrays.sort(tables, SYSTEM_SCHEMA_COMPARATOR);
                 for (DbTableOrView table : tables) {
                     treeIndex = addTableOrView(schema, mainSchema, builder, treeIndex, meta, false, indentation,
-                            isOracle, notManyTables, table, table.isView(), prep, indentNode);
+                            isOracle, notManyTables, table, table.isView(), prepRef, indentNode);
                 }
             } else {
                 for (DbTableOrView table : tables) {
@@ -698,7 +700,7 @@ public class WebApp {
                         continue;
                     }
                     treeIndex = addTableOrView(schema, mainSchema, builder, treeIndex, meta, showColumns, indentation,
-                            isOracle, notManyTables, table, true, prep, indentNode);
+                            isOracle, notManyTables, table, true, prepRef, indentNode);
                 }
             }
         }
@@ -719,7 +721,8 @@ public class WebApp {
 
     private static int addTableOrView(DbSchema schema, boolean mainSchema, StringBuilder builder, int treeIndex,
             DatabaseMetaData meta, boolean showColumns, String indentation, boolean isOracle, boolean notManyTables,
-            DbTableOrView table, boolean isView, PreparedStatement prep, String indentNode) throws SQLException {
+            DbTableOrView table, boolean isView, AtomicReference<PreparedStatement> prepRef, String indentNode)
+                    throws SQLException {
         int tableId = treeIndex;
         String tab = table.getQuotedName();
         if (!mainSchema) {
@@ -735,6 +738,7 @@ public class WebApp {
             StringBuilder columnsBuilder = new StringBuilder();
             treeIndex = addColumns(mainSchema, table, builder, treeIndex, notManyTables, columnsBuilder);
             if (isView) {
+                PreparedStatement prep = prepRef.get();
                 if (prep != null) {
                     prep.setString(2, table.getName());
                     try (ResultSet rs = prep.executeQuery()) {
@@ -746,6 +750,8 @@ public class WebApp {
                                 treeIndex++;
                             }
                         }
+                    } catch (SQLException e) {
+                        prepRef.set(null);
                     }
                 }
             } else if (!isOracle && notManyTables) {
@@ -1246,7 +1252,7 @@ public class WebApp {
                 for (; offset < length; offset++) {
                     char c = sql.charAt(offset);
                     if (c == '(') {
-                        Parser p = new Parser();
+                        ParserBase p = new ParserBase();
                         generatedKeys = p.parseColumnList(sql, offset);
                         offset = p.getLastParseIndex();
                         break;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -47,6 +47,7 @@ public class TestTransaction extends TestDb {
         testForUpdate();
         testForUpdate2();
         testForUpdate3();
+        testForUpdate4();
         testUpdate();
         testMergeUsing();
         testDelete();
@@ -60,6 +61,7 @@ public class TestTransaction extends TestDb {
         testIsolationLevels4();
         testIsolationLevelsCountAggregate();
         testIsolationLevelsCountAggregate2();
+        testIsolationLevelsMetadata();
         deleteDb("transaction");
     }
 
@@ -286,6 +288,45 @@ public class TestTransaction extends TestDb {
         t.join();
         if (ex[0] != null) {
             throw ex[0];
+        }
+        conn1.close();
+        conn2.close();
+    }
+
+    private void testForUpdate4() throws Exception {
+        deleteDb("transaction");
+        Connection conn1 = getConnection("transaction");
+        Connection conn2 = getConnection("transaction");
+        Statement stat1 = conn1.createStatement();
+        Statement stat2 = conn2.createStatement();
+        stat1.execute("CREATE TABLE TEST(ID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, V INT)");
+        stat1.execute("INSERT INTO TEST(V) VALUES 1, 2, 3");
+        conn1.setAutoCommit(false);
+        conn2.setAutoCommit(false);
+        stat1.execute("SET LOCK_TIMEOUT 10000");
+        long n1 = System.nanoTime();
+        stat2.execute("SELECT * FROM TEST WHERE ID = 1 FOR UPDATE");
+        ResultSet rs = stat1.executeQuery("SELECT * FROM TEST ORDER BY ID FOR UPDATE SKIP LOCKED");
+        assertTrue(rs.next());
+        assertEquals(2L, rs.getLong(1));
+        assertTrue(rs.next());
+        assertEquals(3L, rs.getLong(1));
+        assertFalse(rs.next());
+        long n2 = System.nanoTime();
+        if (n2 - n1 > 5_000_000_000L) {
+            fail("FOR UPDATE SKIP LOCKED is too slow");
+        }
+        conn1.commit();
+        n1 = System.nanoTime();
+        assertThrows(ErrorCode.LOCK_TIMEOUT_1, stat1).executeQuery("SELECT * FROM TEST FOR UPDATE NOWAIT");
+        n2 = System.nanoTime();
+        if (n2 - n1 > 5_000_000_000L) {
+            fail("FOR UPDATE NOWAIT is too slow");
+        }
+        assertThrows(ErrorCode.LOCK_TIMEOUT_1, stat1).executeQuery("SELECT * FROM TEST FOR UPDATE WAIT 0.001");
+        n1 = System.nanoTime();
+        if (n1 - n2 > 5_000_000_000L) {
+            fail("FOR UPDATE WAIT 0.001 is too slow");
         }
         conn1.close();
         conn2.close();
@@ -1266,6 +1307,58 @@ public class TestTransaction extends TestDb {
         rs = prep.executeQuery();
         rs.next();
         assertEquals(expected, rs.getLong(1));
+    }
+
+    private void testIsolationLevelsMetadata() throws SQLException {
+        deleteDb("transaction");
+        try (Connection conn1 = getConnection("transaction"); Connection conn2 = getConnection("transaction")) {
+            PreparedStatement prep1 = conn1.prepareStatement(
+                    "SELECT ISOLATION_LEVEL, SESSION_ID = SESSION_ID() FROM INFORMATION_SCHEMA.SESSIONS");
+            PreparedStatement prep2 = conn2.prepareStatement(
+                    "SELECT ISOLATION_LEVEL, SESSION_ID = SESSION_ID() FROM INFORMATION_SCHEMA.SESSIONS");
+            for (int isolationLevel : new int[] { Connection.TRANSACTION_READ_UNCOMMITTED,
+                    Connection.TRANSACTION_READ_COMMITTED, Connection.TRANSACTION_REPEATABLE_READ,
+                    Constants.TRANSACTION_SNAPSHOT, Connection.TRANSACTION_SERIALIZABLE }) {
+                conn2.setTransactionIsolation(isolationLevel);
+                String level;
+                switch (isolationLevel) {
+                case Connection.TRANSACTION_READ_UNCOMMITTED:
+                    level = "READ UNCOMMITTED";
+                    break;
+                case Connection.TRANSACTION_READ_COMMITTED:
+                    level = "READ COMMITTED";
+                    break;
+                case Connection.TRANSACTION_REPEATABLE_READ:
+                    level = "REPEATABLE READ";
+                    break;
+                case Constants.TRANSACTION_SNAPSHOT:
+                    level = "SNAPSHOT";
+                    break;
+                case Connection.TRANSACTION_SERIALIZABLE:
+                    level = "SERIALIZABLE";
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+                }
+                ResultSet rs = prep1.executeQuery();
+                while (rs.next()) {
+                    if (rs.getBoolean(2)) {
+                        assertEquals("READ COMMITTED", rs.getString(1));
+                    } else {
+                        assertEquals(level, rs.getString(1));
+                    }
+                }
+                rs = prep2.executeQuery();
+                while (rs.next()) {
+                    if (rs.getBoolean(2)) {
+                        assertEquals(level, rs.getString(1));
+                    } else {
+                        assertEquals("READ COMMITTED", rs.getString(1));
+                    }
+                }
+            }
+        }
+        deleteDb("transaction");
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -117,6 +117,8 @@ public class Console extends Tool implements ShutdownHandler {
                     i++;
                 } else if ("-webDaemon".equals(arg)) {
                     // no parameters
+                } else if ("-webVirtualThreads".equals(arg)) {
+                    i++;
                 } else if ("-webSSL".equals(arg)) {
                     // no parameters
                 } else if ("-webPort".equals(arg)) {
@@ -140,6 +142,8 @@ public class Console extends Tool implements ShutdownHandler {
                     // no parameters
                 } else if ("-tcpDaemon".equals(arg)) {
                     // no parameters
+                } else if ("-tcpVirtualThreads".equals(arg)) {
+                    i++;
                 } else if ("-tcpSSL".equals(arg)) {
                     // no parameters
                 } else if ("-tcpPort".equals(arg)) {
@@ -163,6 +167,8 @@ public class Console extends Tool implements ShutdownHandler {
                     // no parameters
                 } else if ("-pgDaemon".equals(arg)) {
                     // no parameters
+                } else if ("-pgVirtualThreads".equals(arg)) {
+                    i++;
                 } else if ("-pgPort".equals(arg)) {
                     i++;
                 } else {

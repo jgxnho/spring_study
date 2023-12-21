@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -9,7 +9,7 @@ import java.text.Collator;
 
 import org.h2.api.ErrorCode;
 import org.h2.command.CommandInterface;
-import org.h2.command.Parser;
+import org.h2.command.ParserBase;
 import org.h2.command.Prepared;
 import org.h2.engine.Constants;
 import org.h2.engine.Database;
@@ -83,7 +83,7 @@ public class Set extends Prepared {
 
     @Override
     public long update() {
-        Database database = session.getDatabase();
+        Database database = getDatabase();
         String name = SetTypes.getTypeName(type);
         switch (type) {
         case SetTypes.ALLOW_LITERALS: {
@@ -531,7 +531,7 @@ public class Set extends Prepared {
             break;
         }
         case SetTypes.NON_KEYWORDS:
-            session.setNonKeywords(Parser.parseNonKeywords(stringValueList));
+            session.setNonKeywords(ParserBase.parseNonKeywords(stringValueList));
             break;
         case SetTypes.TIME_ZONE:
             session.setTimeZone(expression == null ? DateTimeUtils.getTimeZone()
@@ -572,7 +572,7 @@ public class Set extends Prepared {
             TimeZoneProvider timeZone;
             try {
                 timeZone = TimeZoneProvider.ofId(v.getString());
-            } catch (IllegalArgumentException ex) {
+            } catch (RuntimeException ex) {
                 throw DbException.getInvalidValueException("TIME ZONE", v.getTraceSQL());
             }
             return timeZone;

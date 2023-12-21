@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -15,13 +15,13 @@ public class Constants {
     /**
      * The build date is updated for each public release.
      */
-    public static final String BUILD_DATE = "2022-06-13";
+    public static final String BUILD_DATE = "2023-09-17";
 
     /**
      * Sequential version number. Even numbers are used for official releases,
      * odd numbers are used for development builds.
      */
-    public static final int BUILD_ID = 214;
+    public static final int BUILD_ID = 224;
 
     /**
      * Whether this is a snapshot version.
@@ -78,7 +78,7 @@ public class Constants {
     /**
      * The minor version of this database.
      */
-    public static final int VERSION_MINOR = 1;
+    public static final int VERSION_MINOR = 2;
 
     /**
      * The lock mode that means no locking is used at all.
@@ -471,6 +471,11 @@ public class Constants {
      * The maximum number of entries in query statistics.
      */
     public static final int QUERY_STATISTICS_MAX_ENTRIES = 100;
+
+    /**
+     * The minimum number of characters in web admin password.
+     */
+    public static final int MIN_WEB_ADMIN_PASSWORD_LENGTH = 12;
 
     /**
      * Announced version for PgServer.

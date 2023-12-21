@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -88,7 +88,9 @@ public class IndexCursor implements Cursor {
                 continue;
             }
             Column column = condition.getColumn();
-            if (condition.getCompareType() == Comparison.IN_LIST) {
+            switch (condition.getCompareType()) {
+            case Comparison.IN_LIST:
+            case Comparison.IN_ARRAY:
                 if (start == null && end == null) {
                     if (canUseIndexForIn(column)) {
                         this.inColumn = column;
@@ -96,14 +98,16 @@ public class IndexCursor implements Cursor {
                         inListIndex = 0;
                     }
                 }
-            } else if (condition.getCompareType() == Comparison.IN_QUERY) {
+                break;
+            case Comparison.IN_QUERY:
                 if (start == null && end == null) {
                     if (canUseIndexForIn(column)) {
                         this.inColumn = column;
                         inResult = condition.getCurrentResult();
                     }
                 }
-            } else {
+                break;
+            default:
                 Value v = condition.getCurrentValue(s);
                 boolean isStart = condition.isStart();
                 boolean isEnd = condition.isEnd();
@@ -136,6 +140,7 @@ public class IndexCursor implements Cursor {
                     inList = null;
                     inResult = null;
                 }
+                break;
             }
         }
         if (inColumn != null) {

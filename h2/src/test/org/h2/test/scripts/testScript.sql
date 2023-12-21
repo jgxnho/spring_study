@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -1664,22 +1664,6 @@ select id from test where c=v order by id;
 > rows (ordered): 3
 
 drop table test;
-> ok
-
-CREATE TABLE TEST(ID INT PRIMARY KEY, NAME VARCHAR(255), C INT);
-> ok
-
-INSERT INTO TEST VALUES(1, '10', NULL), (2, '0', NULL);
-> update count: 2
-
-SELECT LEAST(ID, C, NAME), GREATEST(ID, C, NAME), LEAST(NULL, C), GREATEST(NULL, NULL), ID FROM TEST ORDER BY ID;
-> LEAST(ID, C, NAME) GREATEST(ID, C, NAME) LEAST(NULL, C) CAST(NULL AS CHARACTER VARYING) ID
-> ------------------ --------------------- -------------- ------------------------------- --
-> 1                  10                    null           null                            1
-> 0                  2                     null           null                            2
-> rows (ordered): 2
-
-DROP TABLE TEST;
 > ok
 
 create table people (family varchar(1) not null, person varchar(1) not null);
@@ -5109,7 +5093,7 @@ SELECT T1.* T2;
 > exception SYNTAX_ERROR_1
 
 select replace('abchihihi', 'i', 'o') abcehohoho, replace('this is tom', 'i') 1e_th_st_om from test;
-> exception SYNTAX_ERROR_1
+> exception SYNTAX_ERROR_2
 
 select monthname(date )'005-0E9-12') d_set fm test;
 > exception SYNTAX_ERROR_1

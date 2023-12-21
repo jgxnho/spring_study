@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.ExpressionColumn;
+import org.h2.expression.ExpressionList;
 import org.h2.expression.ExpressionVisitor;
 import org.h2.expression.Parameter;
 import org.h2.expression.TypedValueExpression;
@@ -25,6 +26,7 @@ import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueBoolean;
 import org.h2.value.ValueNull;
+import org.h2.value.ValueRow;
 
 /**
  * Example comparison expressions are ID=1, NAME=NAME, NAME IS NULL.
@@ -99,9 +101,15 @@ public final class Comparison extends Condition {
 
     /**
      * This is a pseudo comparison type that is only used for index conditions.
+     * It means equals any value of an ARRAY. Example: ARRAY[1, 2, 3].
+     */
+    public static final int IN_ARRAY = 11;
+
+    /**
+     * This is a pseudo comparison type that is only used for index conditions.
      * It means equals any value of a list. Example: IN(SELECT ...).
      */
-    public static final int IN_QUERY = 11;
+    public static final int IN_QUERY = 12;
 
     private int compareType;
     private Expression left;
@@ -359,12 +367,11 @@ public final class Comparison extends Condition {
         if (compareType == SPATIAL_INTERSECTS || whenOperand) {
             return null;
         }
-        int type = getNotCompareType();
-        return new Comparison(type, left, right, false);
+        return new Comparison(getNotCompareType(compareType), left, right, false);
     }
 
-    private int getNotCompareType() {
-        switch (compareType) {
+    static int getNotCompareType(int type) {
+        switch (type) {
         case EQUAL:
             return NOT_EQUAL;
         case EQUAL_NULL_SAFE:
@@ -382,7 +389,7 @@ public final class Comparison extends Condition {
         case SMALLER:
             return BIGGER_EQUAL;
         default:
-            throw DbException.getInternalError("type=" + compareType);
+            throw DbException.getInternalError("type=" + type);
         }
     }
 
@@ -394,8 +401,25 @@ public final class Comparison extends Condition {
     }
 
     static void createIndexConditions(TableFilter filter, Expression left, Expression right, int compareType) {
+        if (compareType == NOT_EQUAL || compareType == NOT_EQUAL_NULL_SAFE) {
+            return;
+        }
         if (!filter.getTable().isQueryComparable()) {
             return;
+        }
+        if (compareType != SPATIAL_INTERSECTS) {
+            boolean lIsList = left instanceof ExpressionList, rIsList = right instanceof ExpressionList;
+            if (lIsList) {
+                if (rIsList) {
+                    createIndexConditions(filter, (ExpressionList) left, (ExpressionList) right, compareType);
+                } else if (right instanceof ValueExpression) {
+                    createIndexConditions(filter, (ExpressionList) left, (ValueExpression) right, compareType);
+                }
+            } else if (rIsList && left instanceof ValueExpression) {
+                createIndexConditions(filter, (ExpressionList) right, (ValueExpression) left,
+                        getReversedCompareType(compareType));
+                return;
+            }
         }
         ExpressionColumn l = null;
         if (left instanceof ExpressionColumn) {
@@ -425,9 +449,6 @@ public final class Comparison extends Condition {
             }
         }
         switch (compareType) {
-        case NOT_EQUAL:
-        case NOT_EQUAL_NULL_SAFE:
-            break;
         case EQUAL:
         case EQUAL_NULL_SAFE:
         case BIGGER:
@@ -450,6 +471,57 @@ public final class Comparison extends Condition {
             break;
         default:
             throw DbException.getInternalError("type=" + compareType);
+        }
+    }
+
+    private static void createIndexConditions(TableFilter filter, ExpressionList left, ExpressionList right,
+            int compareType) {
+        int c = left.getSubexpressionCount();
+        if (c == 0 || c != right.getSubexpressionCount()) {
+            return;
+        }
+        if (compareType != EQUAL && compareType != EQUAL_NULL_SAFE) {
+            if (c > 1) {
+                if (compareType == BIGGER) {
+                    compareType = BIGGER_EQUAL;
+                } else if (compareType == SMALLER) {
+                    compareType = SMALLER_EQUAL;
+                }
+            }
+            c = 1;
+        }
+        for (int i = 0; i < c; i++) {
+            createIndexConditions(filter, left.getSubexpression(i), right.getSubexpression(i), compareType);
+        }
+    }
+
+    private static void createIndexConditions(TableFilter filter, ExpressionList left, ValueExpression right,
+            int compareType) {
+        int c = left.getSubexpressionCount();
+        if (c == 0) {
+            return;
+        } else if (c == 1) {
+            createIndexConditions(filter, left.getSubexpression(0), right, compareType);
+        } else if (c > 1) {
+            Value v = right.getValue(null);
+            if (v.getValueType() == Value.ROW) {
+                Value[] values = ((ValueRow) v).getList();
+                if (c != values.length) {
+                    return;
+                }
+                if (compareType != EQUAL && compareType != EQUAL_NULL_SAFE) {
+                    if (compareType == BIGGER) {
+                        compareType = BIGGER_EQUAL;
+                    } else if (compareType == SMALLER) {
+                        compareType = SMALLER_EQUAL;
+                    }
+                    c = 1;
+                }
+                for (int i = 0; i < c; i++) {
+                    createIndexConditions(filter, left.getSubexpression(i), ValueExpression.get(values[i]),
+                            compareType);
+                }
+            }
         }
     }
 

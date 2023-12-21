@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -30,7 +30,7 @@ SELECT INDEX_NAME, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, IS_UNIQUE FROM INF
 > rows (ordered): 2
 
 SELECT DB_OBJECT_SQL('INDEX', 'PUBLIC', 'TEST_IDX');
->> CREATE UNIQUE INDEX "PUBLIC"."TEST_IDX" ON "PUBLIC"."TEST"("C" NULLS FIRST) INCLUDE("B" NULLS FIRST)
+>> CREATE UNIQUE NULLS DISTINCT INDEX "PUBLIC"."TEST_IDX" ON "PUBLIC"."TEST"("C" NULLS FIRST) INCLUDE("B" NULLS FIRST)
 
 ALTER TABLE TEST ADD CONSTRAINT TEST_UNI_C UNIQUE(C);
 > ok

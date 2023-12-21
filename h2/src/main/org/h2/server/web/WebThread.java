@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -25,6 +25,7 @@ import org.h2.util.NetUtils;
 import org.h2.util.NetworkConnectionInfo;
 import org.h2.util.StringUtils;
 import org.h2.util.Utils;
+import org.h2.util.Utils21;
 
 /**
  * For each connection to a session, an object of this class is created.
@@ -47,7 +48,8 @@ class WebThread extends WebApp implements Runnable {
     WebThread(Socket socket, WebServer server) {
         super(server);
         this.socket = socket;
-        thread = new Thread(this, "H2 Console thread");
+        thread = server.virtualThreads ? Utils21.newVirtualThread(this) : new Thread(this);
+        thread.setName("H2 Console thread");
     }
 
     /**

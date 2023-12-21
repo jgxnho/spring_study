@@ -1,6 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <!--
-Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 and the EPL 1.0 (https://h2database.com/html/license.html).
 Initial Developer: H2 Group
 -->
@@ -88,7 +88,7 @@ translate -->
 <a href="grammar.html">SQL Grammar</a><br />
 <a href="systemtables.html">System Tables</a><br />
 <a href="../javadoc/index.html">Javadoc</a><br />
-<a href="https://github.com/h2database/h2database/releases/download/version-2.1.214/h2.pdf">PDF (2 MB)</a><br />
+<a href="https://github.com/h2database/h2database/releases/download/version-2.2.224/h2.pdf">PDF (2 MB)</a><br />
 <br />
 <b>Support</b><br />
 <a href="faq.html">FAQ</a><br />
@@ -646,7 +646,7 @@ It is possible to set the value in the database URL: <code>jdbc:h2:~/test;DB_CLO
 <h3 id="do_not_close_on_exit">Don't Close a Database when the VM Exits</h3>
 <p>
 By default, a database is closed when the last connection is closed. However, if it is never closed,
-the database is closed when the virtual machine exits normally, using a shutdown hook.
+a persistent database is closed when the virtual machine exits normally, using a shutdown hook.
 In some situations, the database should not be closed in this case, for example because the
 database is still used at virtual machine shutdown (to store the shutdown process in the database for example).
 For those cases, the automatic closing of the database can be disabled in the database URL.
@@ -657,6 +657,10 @@ The database URL to disable database closing on exit is:
 <pre>
 String url = "jdbc:h2:~/test;DB_CLOSE_ON_EXIT=FALSE";
 </pre>
+<b>Warning:</b> when database closing on exit is disabled, an application <b>must</b> execute the
+<a href="commands.html#shutdown">SHUTDOWN</a> command by itself in its own shutdown hook
+after completion of all operations with database to avoid data loss
+and should not try to establish new connections to database after that.
 
 <h2 id="execute_sql_on_connection">Execute SQL on Connection</h2>
 <p>
@@ -980,6 +984,7 @@ It means a NULL value may be specified for this column in INSERT command and it 
 </li><li>Attempt to reference a non-unique set of columns from a referential constraint
 will create an UNIQUE constraint on them automatically.
 </li><li>Unsafe comparison operators between numeric and boolean values are allowed.
+</li><li>GREATEST and LEAST ignore NULL values by default.
 </li><li>IDENTITY() and SCOPE_IDENTITY() are supported, but both are implemented like SCOPE_IDENTITY()
 </li><li>SYSDATE, SYSTIMESTAMP, and TODAY are supported.
 </li></ul>
@@ -1033,8 +1038,9 @@ or the SQL statement <code>SET MODE HSQLDB</code>.
 
 <h3>MS SQL Server Compatibility Mode</h3>
 <p>
-To use the MS SQL Server mode, use the database URL <code>jdbc:h2:~/test;MODE=MSSQLServer</code>
-or the SQL statement <code>SET MODE MSSQLServer</code>.
+To use the MS SQL Server mode, use the database URL
+<code>jdbc:h2:~/test;MODE=MSSQLServer;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE</code>.
+Do not change value of DATABASE_TO_LOWER and CASE_INSENSITIVE_IDENTIFIERS after creation of database.
 </p>
 <ul><li>For aliased columns, <code>ResultSetMetaData.getColumnName()</code>
     returns the alias name and <code>getTableName()</code> returns
@@ -1042,6 +1048,7 @@ or the SQL statement <code>SET MODE MSSQLServer</code>.
 </li><li>Identifiers may be quoted using square brackets as in <code>[Test]</code>.
 </li><li>For unique indexes, <code>NULL</code> is distinct.
     That means only one row with <code>NULL</code> in one of the columns is allowed.
+</li><li>GREATEST and LEAST ignore NULL values by default.
 </li><li>Text can be concatenated using '+'.
 </li><li>Arguments of LOG() function are swapped.
 </li><li>MONEY data type is treated like NUMERIC(19, 4) data type. SMALLMONEY data type is treated like NUMERIC(10, 4)
@@ -1087,6 +1094,7 @@ inserted.
 </li><li>YEAR data type is treated like SMALLINT data type.
 </li><li>GROUP BY clause can contain 1-based positions of expressions from the SELECT list.
 </li><li>Unsafe comparison operators between numeric and boolean values are allowed.
+</li><li>Accepts non-standard JSON_OBJECT and JSON_OBJECTAGG syntax using comma as key/value separator.
 </li></ul>
 <p>
 Text comparison in MariaDB is case insensitive by default, while in H2 it is case sensitive (as in most other databases).
@@ -1128,6 +1136,7 @@ and create a unique constraint automatically if such constraint doesn't exist.
 </li><li>YEAR data type is treated like SMALLINT data type.
 </li><li>GROUP BY clause can contain 1-based positions of expressions from the SELECT list.
 </li><li>Unsafe comparison operators between numeric and boolean values are allowed.
+</li><li>Accepts non-standard JSON_OBJECT and JSON_OBJECTAGG syntax using comma as key/value separator.
 </li></ul>
 <p>
 Text comparison in MySQL is case insensitive by default, while in H2 it is case sensitive (as in most other databases).
@@ -1174,6 +1183,7 @@ Do not change value of DATABASE_TO_LOWER after creation of database.
     digits are not be truncated, but the value is rounded.
 </li><li>The system columns <code>ctid</code> and
     <code>oid</code> are supported.
+</li><li>GREATEST and LEAST ignore NULL values by default.
 </li><li>LOG(x) is base 10 in this mode.
 </li><li>REGEXP_REPLACE():
     <ul>
@@ -1191,7 +1201,7 @@ Do not change value of DATABASE_TO_LOWER after creation of database.
 </li><li>Datetime value functions return the same value within a transaction.
 </li><li>ARRAY_SLICE() out of bounds parameters are silently corrected.
 </li><li>EXTRACT function with DOW field returns (0-6), Sunday is 0.
-</li><li>UPDATE with FROM is supported.
+</li><li>UPDATE with FROM is partially supported.
 </li><li>GROUP BY clause can contain 1-based positions of expressions from the SELECT list.
 </li></ul>
 

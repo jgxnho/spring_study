@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -23,30 +23,6 @@ public class Mode {
 
     public enum ModeEnum {
         REGULAR, STRICT, LEGACY, DB2, Derby, MariaDB, MSSQLServer, HSQLDB, MySQL, Oracle, PostgreSQL
-    }
-
-    /**
-     * Determines how rows with {@code NULL} values in indexed columns are handled
-     * in unique indexes.
-     */
-    public enum UniqueIndexNullsHandling {
-        /**
-         * Multiple rows with identical values in indexed columns with at least one
-         * indexed {@code NULL} value are allowed in unique index.
-         */
-        ALLOW_DUPLICATES_WITH_ANY_NULL,
-
-        /**
-         * Multiple rows with identical values in indexed columns with all indexed
-         * {@code NULL} values are allowed in unique index.
-         */
-        ALLOW_DUPLICATES_WITH_ALL_NULLS,
-
-        /**
-         * Multiple rows with identical values in indexed columns are not allowed in
-         * unique index.
-         */
-        FORBID_ANY_DUPLICATES
     }
 
     /**
@@ -166,14 +142,19 @@ public class Mode {
 
     /**
      * Determines how rows with {@code NULL} values in indexed columns are handled
-     * in unique indexes.
+     * in unique indexes and constraints by default.
      */
-    public UniqueIndexNullsHandling uniqueIndexNullsHandling = UniqueIndexNullsHandling.ALLOW_DUPLICATES_WITH_ANY_NULL;
+    public NullsDistinct nullsDistinct = NullsDistinct.DISTINCT;
 
     /**
      * Empty strings are treated like NULL values. Useful for Oracle emulation.
      */
     public boolean treatEmptyStringsAsNull;
+
+    /**
+     * If {@code true} GREATEST and LEAST ignore nulls
+     */
+    public boolean greatestLeastIgnoreNulls;
 
     /**
      * Support the pseudo-table SYSIBM.SYSDUMMY1.
@@ -284,6 +265,21 @@ public class Mode {
      * If {@code true} non-standard ALTER TABLE MODIFY COLUMN is allowed.
      */
     public boolean alterTableModifyColumn;
+
+    /**
+     * If {@code true} non-standard ALTER TABLE MODIFY COLUMN preserves nullability when changing data type.
+     */
+    public boolean alterTableModifyColumnPreserveNullability;
+
+    /**
+     * If {@code true} MySQL table and column options are allowed
+     */
+    public boolean mySqlTableOptions;
+
+    /**
+     * If {@code true} DELETE identifier FROM is allowed
+     */
+    public boolean deleteIdentifierFrom;
 
     /**
      * If {@code true} TRUNCATE TABLE uses RESTART IDENTITY by default.
@@ -455,6 +451,11 @@ public class Mode {
      */
     public boolean numericWithBooleanComparison;
 
+    /**
+     * Accepts comma ',' as key/value separator in JSON_OBJECT and JSON_OBJECTAGG functions.
+     */
+    public boolean acceptsCommaAsJsonKeyValueSeparator;
+
     private final String name;
 
     private final ModeEnum modeEnum;
@@ -498,6 +499,8 @@ public class Mode {
         mode.createUniqueConstraintForReferencedColumns = true;
         // Legacy numeric with boolean comparison
         mode.numericWithBooleanComparison = true;
+        // Legacy GREATEST and LEAST null treatment
+        mode.greatestLeastIgnoreNulls = true;
         add(mode);
 
         mode = new Mode(ModeEnum.DB2);
@@ -523,7 +526,7 @@ public class Mode {
 
         mode = new Mode(ModeEnum.Derby);
         mode.aliasColumnName = true;
-        mode.uniqueIndexNullsHandling = UniqueIndexNullsHandling.FORBID_ANY_DUPLICATES;
+        mode.nullsDistinct = NullsDistinct.NOT_DISTINCT;
         mode.sysDummy1 = true;
         mode.isolationLevelInSelectOrInsertStatement = true;
         // Derby does not support client info properties as of version 10.12.1.1
@@ -550,7 +553,8 @@ public class Mode {
         mode = new Mode(ModeEnum.MSSQLServer);
         mode.aliasColumnName = true;
         mode.squareBracketQuotedNames = true;
-        mode.uniqueIndexNullsHandling = UniqueIndexNullsHandling.FORBID_ANY_DUPLICATES;
+        mode.nullsDistinct = NullsDistinct.NOT_DISTINCT;
+        mode.greatestLeastIgnoreNulls = true;
         mode.allowPlusForStringConcat = true;
         mode.swapLogFunctionParameters = true;
         mode.swapConvertFunctionParameters = true;
@@ -593,6 +597,8 @@ public class Mode {
         mode.allowUnrelatedOrderByExpressionsInDistinctQueries = true;
         mode.alterTableExtensionsMySQL = true;
         mode.alterTableModifyColumn = true;
+        mode.mySqlTableOptions = true;
+        mode.deleteIdentifierFrom = true;
         mode.truncateTableRestartIdentity = true;
         mode.allNumericTypesHavePrecision = true;
         mode.nextValueReturnsDifferentValues = true;
@@ -606,6 +612,7 @@ public class Mode {
         mode.typeByNameMap.put("YEAR", DataType.getDataType(Value.SMALLINT));
         mode.groupByColumnIndex = true;
         mode.numericWithBooleanComparison = true;
+        mode.acceptsCommaAsJsonKeyValueSeparator = true;
         add(mode);
 
         mode = new Mode(ModeEnum.MySQL);
@@ -622,6 +629,8 @@ public class Mode {
         mode.allowUnrelatedOrderByExpressionsInDistinctQueries = true;
         mode.alterTableExtensionsMySQL = true;
         mode.alterTableModifyColumn = true;
+        mode.mySqlTableOptions = true;
+        mode.deleteIdentifierFrom = true;
         mode.truncateTableRestartIdentity = true;
         mode.allNumericTypesHavePrecision = true;
         mode.updateSequenceOnManualIdentityInsertion = true;
@@ -635,12 +644,13 @@ public class Mode {
         mode.typeByNameMap.put("YEAR", DataType.getDataType(Value.SMALLINT));
         mode.groupByColumnIndex = true;
         mode.numericWithBooleanComparison = true;
+        mode.acceptsCommaAsJsonKeyValueSeparator = true;
         add(mode);
 
         mode = new Mode(ModeEnum.Oracle);
         mode.aliasColumnName = true;
         mode.convertOnlyToSmallerScale = true;
-        mode.uniqueIndexNullsHandling = UniqueIndexNullsHandling.ALLOW_DUPLICATES_WITH_ALL_NULLS;
+        mode.nullsDistinct = NullsDistinct.ALL_DISTINCT;
         mode.treatEmptyStringsAsNull = true;
         mode.regexpReplaceBackslashReferences = true;
         mode.supportPoundSymbolForColumnNames = true;
@@ -649,6 +659,7 @@ public class Mode {
         mode.supportedClientInfoPropertiesRegEx =
                 Pattern.compile(".*\\..*");
         mode.alterTableModifyColumn = true;
+        mode.alterTableModifyColumnPreserveNullability = true;
         mode.decimalSequences = true;
         mode.charAndByteLengthUnits = true;
         mode.nextvalAndCurrvalPseudoColumns = true;
@@ -664,6 +675,7 @@ public class Mode {
         mode = new Mode(ModeEnum.PostgreSQL);
         mode.aliasColumnName = true;
         mode.systemColumns = true;
+        mode.greatestLeastIgnoreNulls = true;
         mode.logIsLogBase10 = true;
         mode.regexpReplaceBackslashReferences = true;
         mode.insertOnConflict = true;

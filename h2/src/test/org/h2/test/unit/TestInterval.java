@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -234,7 +234,7 @@ public class TestInterval extends TestBase {
     private void testOfNanosGood(long nanos) {
         Interval i = Interval.ofNanos(nanos);
         long seconds = nanos / NANOS_PER_SECOND;
-        long nanosOfSecond = nanos % NANOS_PER_SECOND;
+        int nanosOfSecond = (int) (nanos % NANOS_PER_SECOND);
         assertEquals(seconds, i.getSeconds());
         assertEquals(nanosOfSecond, i.getNanosOfSecond());
         assertEquals(nanos, i.getSecondsAndNanos());

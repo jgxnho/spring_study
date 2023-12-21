@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -119,6 +119,7 @@ public class TestPreparedStatement extends TestDb {
         testMultipleStatements(conn);
         testParameterInSubquery(conn);
         testAfterRollback(conn);
+        testUnnestWithArrayParameter(conn);
         conn.close();
         testPreparedStatementWithLiteralsNone();
         testPreparedStatementWithIndexedParameterAndLiteralsNone();
@@ -409,7 +410,7 @@ public class TestPreparedStatement extends TestDb {
 
     private void testCancelReuse(Connection conn) throws Exception {
         conn.createStatement().execute(
-                "CREATE ALIAS SLEEP FOR 'java.lang.Thread.sleep'");
+                "CREATE ALIAS SLEEP FOR 'java.lang.Thread.sleep(long)'");
         // sleep for 10 seconds
         final PreparedStatement prep = conn.prepareStatement(
                 "SELECT SLEEP(?) FROM SYSTEM_RANGE(1, 10000) LIMIT ?");
@@ -1778,6 +1779,22 @@ public class TestPreparedStatement extends TestDb {
                 stat.execute("DROP TABLE IF EXISTS TEST");
                 conn.setAutoCommit(true);
             }
+        }
+    }
+
+    private void testUnnestWithArrayParameter(Connection conn) throws SQLException {
+        PreparedStatement prep = conn.prepareStatement(
+                "SELECT * FROM ("
+                + "SELECT * FROM UNNEST(CAST(? AS INTEGER ARRAY)) UNION SELECT * FROM UNNEST(CAST(? AS INTEGER ARRAY))"
+                + ") ORDER BY 1");
+        prep.setObject(1, new Integer[] {1, 2, 3});
+        prep.setObject(2, new Integer[] {3, 4, 5});
+        try (ResultSet rs = prep.executeQuery()) {
+            for (int i = 1; i <= 5; i++) {
+                assertTrue(rs.next());
+                assertEquals(i, rs.getInt(1));
+            }
+            assertFalse(rs.next());
         }
     }
 

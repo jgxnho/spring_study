@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -19,6 +19,7 @@ import java.util.Objects;
 
 import org.h2.api.ErrorCode;
 import org.h2.command.Prepared;
+import org.h2.engine.NullsDistinct;
 import org.h2.engine.SessionLocal;
 import org.h2.index.Index;
 import org.h2.index.IndexType;
@@ -293,8 +294,9 @@ public class TableLink extends Table {
             if (!rs.getBoolean("NON_UNIQUE")) {
                 uniqueColumnCount++;
             }
-            indexType = uniqueColumnCount > 0 ? IndexType.createUnique(false, false) :
-                    IndexType.createNonUnique(false);
+            indexType = uniqueColumnCount > 0
+                    ? IndexType.createUnique(false, false, uniqueColumnCount, /* TODO */ NullsDistinct.NOT_DISTINCT)
+                    : IndexType.createNonUnique(false);
             String col = rs.getString("COLUMN_NAME");
             col = convertColumnName(col);
             Column column = columnMap.get(col);
@@ -470,8 +472,8 @@ public class TableLink extends Table {
 
     @Override
     public synchronized long getRowCount(SessionLocal session) {
-        //The foo alias is used to support the PostgreSQL syntax
-        String sql = "SELECT COUNT(*) FROM " + qualifiedTableName + " as foo";
+        //The T alias is used to support the PostgreSQL syntax
+        String sql = "SELECT COUNT(*) FROM " + qualifiedTableName + " T";
         try {
             PreparedStatement prep = execute(sql, null, false, session);
             ResultSet rs = prep.getResultSet();

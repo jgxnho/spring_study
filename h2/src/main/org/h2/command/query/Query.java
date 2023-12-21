@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -279,11 +279,19 @@ public abstract class Query extends Prepared {
     }
 
     /**
-     * Set the 'for update' flag.
-     *
-     * @param forUpdate the new setting
+     * Returns FOR UPDATE clause, if any.
+     * @return FOR UPDATE clause or {@code null}
      */
-    public abstract void setForUpdate(boolean forUpdate);
+    public ForUpdate getForUpdate() {
+        return null;
+    }
+
+    /**
+     * Set the FOR UPDATE clause.
+     *
+     * @param forUpdate the new FOR UPDATE clause
+     */
+    public abstract void setForUpdate(ForUpdate forUpdate);
 
     /**
      * Get the column count of this query.
@@ -489,12 +497,12 @@ public abstract class Query extends Prepared {
             return queryWithoutCacheLazyCheck(limit, target);
         }
         fireBeforeSelectTriggers();
-        if (noCache || !session.getDatabase().getOptimizeReuseResults() ||
+        if (noCache || !getDatabase().getOptimizeReuseResults() ||
                 (session.isLazyQueryExecution() && !neverLazy)) {
             return queryWithoutCacheLazyCheck(limit, target);
         }
         Value[] params = getParameterValues();
-        long now = session.getDatabase().getModificationDataId();
+        long now = getDatabase().getModificationDataId();
         if (isEverything(ExpressionVisitor.DETERMINISTIC_VISITOR)) {
             if (lastResult != null && !lastResult.isClosed() &&
                     limit == lastLimit) {
@@ -535,11 +543,11 @@ public abstract class Query extends Prepared {
             return executeExists();
         }
         fireBeforeSelectTriggers();
-        if (noCache || !session.getDatabase().getOptimizeReuseResults()) {
+        if (noCache || !getDatabase().getOptimizeReuseResults()) {
             return executeExists();
         }
         Value[] params = getParameterValues();
-        long now = session.getDatabase().getModificationDataId();
+        long now = getDatabase().getModificationDataId();
         if (isEverything(ExpressionVisitor.DETERMINISTIC_VISITOR)) {
             if (lastExists != null) {
                 if (sameResultAsLast(params, lastParameters, lastEvaluated)) {
@@ -604,7 +612,7 @@ public abstract class Query extends Prepared {
      */
     int initExpression(ArrayList<String> expressionSQL, Expression e, boolean mustBeInResult,
             ArrayList<TableFilter> filters) {
-        Database db = session.getDatabase();
+        Database db = getDatabase();
         // special case: SELECT 1 AS A FROM DUAL ORDER BY A
         // (oracle supports it, but only in order by, not in group by and
         // not in having):
@@ -1001,7 +1009,7 @@ public abstract class Query extends Prepared {
         if (!checkInit) {
             init();
         }
-        return new DerivedTable(forCreateView ? session.getDatabase().getSystemSession() : session, alias,
+        return new DerivedTable(forCreateView ? getDatabase().getSystemSession() : session, alias,
                 columnTemplates, this, topQuery);
     }
 
@@ -1031,6 +1039,12 @@ public abstract class Query extends Prepared {
      */
     public Expression getIfSingleRow() {
         return null;
+    }
+
+    @Override
+    public boolean isRetryable() {
+        ForUpdate forUpdate = getForUpdate();
+        return forUpdate == null || forUpdate.getType() == ForUpdate.Type.SKIP_LOCKED;
     }
 
 }

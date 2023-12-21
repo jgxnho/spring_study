@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -38,12 +38,12 @@ public final class StringFunction extends FunctionN {
     public static final int REPLACE = INSERT + 1;
 
     /**
-     * LPAD() (non-standard).
+     * LPAD().
      */
     public static final int LPAD = REPLACE + 1;
 
     /**
-     * RPAD() (non-standard).
+     * RPAD().
      */
     public static final int RPAD = LPAD + 1;
 

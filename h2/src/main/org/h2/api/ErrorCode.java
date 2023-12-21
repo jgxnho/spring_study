@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -222,6 +222,18 @@ public class ErrorCode {
      * </pre>
      */
     public static final int ARRAY_ELEMENT_ERROR_2 = 22034;
+
+    /**
+     * The error with code <code>22035</code> is thrown when an
+     * attempt is made to update an element in NULL array.
+     *
+     * Example:
+     * <pre>
+     * CREATE TABLE TEST(A INTEGER ARRAY) AS VALUES NULL;
+     * UPDATE TEST SET A[1] = 2;
+     * </pre>
+     */
+    public static final int NULL_VALUE_IN_ARRAY_TARGET = 22035;
 
     // 23: constraint violation
 
@@ -1128,7 +1140,7 @@ public class ErrorCode {
 
     /**
     * The error with code <code>90056</code> is thrown when trying to format a
-    * timestamp using TO_DATE and TO_TIMESTAMP  with an invalid format.
+    * timestamp using TO_DATE and TO_TIMESTAMP with an invalid format.
     */
     public static final int INVALID_TO_DATE_FORMAT = 90056;
 
@@ -1878,9 +1890,8 @@ public class ErrorCode {
     /**
      * The error with code <code>90125</code> is thrown when
      * PreparedStatement.setBigDecimal is called with object that extends the
-     * class BigDecimal, and the system property h2.allowBigDecimalExtensions is
-     * not set. Using extensions of BigDecimal is dangerous because the database
-     * relies on the behavior of BigDecimal. Example of wrong usage:
+     * class BigDecimal. Using extensions of BigDecimal is dangerous because the
+     * database relies on the behavior of BigDecimal. Example of wrong usage:
      * <pre>
      * BigDecimal bd = new MyDecimal("$10.3");
      * prep.setBigDecimal(1, bd);
@@ -2300,6 +2311,7 @@ public class ErrorCode {
         case COLUMN_COUNT_DOES_NOT_MATCH: return "21S02";
 
         // 22: data exception
+        case NULL_VALUE_IN_ARRAY_TARGET: return "2200E";
         case ARRAY_ELEMENT_ERROR_2: return "2202E";
 
         // 42: syntax error or access rule violation

@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -281,3 +281,55 @@ SCRIPT NOPASSWORDS NOSETTINGS NOVERSION TABLE TEST;
 
 DROP TABLE TEST;
 > ok
+
+VALUES '1E100' > 0;
+>> TRUE
+
+SELECT 'NaN' = CAST('NaN' AS DECFLOAT);
+>> TRUE
+
+SELECT CAST('NaN' AS DOUBLE ) = CAST('NaN' AS DECFLOAT);
+>> TRUE
+
+SELECT 111222E+8_8, 111_222E+1_4;
+> 1.11222E+93 1.11222E+19
+> ----------- -----------
+> 1.11222E+93 1.11222E+19
+> rows: 1
+
+SELECT 111222333444555666777E+8_8, 111_222_333_444_555_666_777E+1_4;
+> 1.11222333444555666777E+108 1.11222333444555666777E+34
+> --------------------------- --------------------------
+> 1.11222333444555666777E+108 1.11222333444555666777E+34
+> rows: 1
+
+SELECT 111222333444555666777.123E+8_8, 111_222_333_444_555_666_777.888_999E+1_4;
+> 1.11222333444555666777123E+108 1.11222333444555666777888999E+34
+> ------------------------------ --------------------------------
+> 1.11222333444555666777123E+108 1.11222333444555666777888999E+34
+> rows: 1
+
+SELECT 1E;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E+;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E-;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E_3;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E+_3;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E+3__3;
+> exception SYNTAX_ERROR_2
+
+SELECT 1E+8_;
+> exception SYNTAX_ERROR_2
+
+SELECT 1.3_E+3__3;
+> exception SYNTAX_ERROR_2
+

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -9,7 +9,7 @@ import java.sql.ResultSetMetaData;
 import java.util.Objects;
 
 import org.h2.api.ErrorCode;
-import org.h2.command.Parser;
+import org.h2.command.ParserBase;
 import org.h2.command.ddl.SequenceOptions;
 import org.h2.engine.CastDataProvider;
 import org.h2.engine.Constants;
@@ -274,7 +274,7 @@ public final class Column implements HasSQL, Typed, ColumnTemplate {
 
     @Override
     public String getSQL(int sqlFlags) {
-        return rowId ? name : Parser.quoteIdentifier(name, sqlFlags);
+        return rowId ? name : ParserBase.quoteIdentifier(name, sqlFlags);
     }
 
     @Override

@@ -1,11 +1,12 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
 package org.h2.engine;
 
 import java.util.ArrayList;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.h2.command.CommandInterface;
 import org.h2.jdbc.meta.DatabaseMeta;
@@ -90,6 +91,8 @@ public abstract class Session implements CastDataProvider, AutoCloseable {
 
     }
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     private ArrayList<String> sessionState;
 
     boolean sessionStateChanged;
@@ -99,6 +102,42 @@ public abstract class Session implements CastDataProvider, AutoCloseable {
     volatile StaticSettings staticSettings;
 
     Session() {
+    }
+
+    /**
+     * Locks this session with a reentrant lock.
+     *
+     * <pre>
+     * final Session session = ...;
+     * session.lock();
+     * try {
+     *     ...
+     * } finally {
+     *     session.unlock();
+     * }
+     * </pre>
+     */
+    public final void lock() {
+        lock.lock();
+    }
+
+    /**
+     * Unlocks this session.
+     *
+     * @see #lock()
+     */
+    public final void unlock() {
+        lock.unlock();
+    }
+
+    /**
+     * Returns whether this session is locked by the current thread.
+     *
+     * @return {@code true} if it locked by the current thread, {@code false} if
+     *         it is locked by another thread or is not locked at all
+     */
+    public final boolean isLockedByCurrentThread() {
+        return lock.isHeldByCurrentThread();
     }
 
     /**

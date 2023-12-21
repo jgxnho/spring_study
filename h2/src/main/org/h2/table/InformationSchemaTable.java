@@ -1,11 +1,10 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
 package org.h2.table;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashSet;
@@ -15,7 +14,7 @@ import java.util.Map;
 import org.h2.api.IntervalQualifier;
 import org.h2.api.Trigger;
 import org.h2.command.Command;
-import org.h2.command.Parser;
+import org.h2.command.ParserBase;
 import org.h2.constraint.Constraint;
 import org.h2.constraint.Constraint.Type;
 import org.h2.constraint.ConstraintCheck;
@@ -24,6 +23,7 @@ import org.h2.constraint.ConstraintReferential;
 import org.h2.constraint.ConstraintUnique;
 import org.h2.engine.Constants;
 import org.h2.engine.DbObject;
+import org.h2.engine.NullsDistinct;
 import org.h2.engine.QueryStatisticsData;
 import org.h2.engine.Right;
 import org.h2.engine.RightOwner;
@@ -36,22 +36,20 @@ import org.h2.expression.Expression;
 import org.h2.expression.ExpressionVisitor;
 import org.h2.expression.ValueExpression;
 import org.h2.index.Index;
+import org.h2.index.IndexType;
 import org.h2.index.MetaIndex;
 import org.h2.message.DbException;
-import org.h2.mvstore.FileStore;
-import org.h2.mvstore.MVStore;
-import org.h2.mvstore.db.Store;
 import org.h2.result.Row;
 import org.h2.result.SearchRow;
 import org.h2.result.SortOrder;
 import org.h2.schema.Constant;
 import org.h2.schema.Domain;
 import org.h2.schema.FunctionAlias;
+import org.h2.schema.FunctionAlias.JavaMethod;
 import org.h2.schema.Schema;
 import org.h2.schema.Sequence;
 import org.h2.schema.TriggerObject;
 import org.h2.schema.UserDefinedFunction;
-import org.h2.schema.FunctionAlias.JavaMethod;
 import org.h2.store.InDoubtTransaction;
 import org.h2.util.DateTimeUtils;
 import org.h2.util.MathUtils;
@@ -593,6 +591,7 @@ public final class InformationSchemaTable extends MetaTable {
                     column("IS_DEFERRABLE"), //
                     column("INITIALLY_DEFERRED"), //
                     column("ENFORCED"), //
+                    column("NULLS_DISTINCT"), //
                     // extensions
                     column("INDEX_CATALOG"), //
                     column("INDEX_SCHEMA"), //
@@ -714,6 +713,7 @@ public final class InformationSchemaTable extends MetaTable {
                     column("TABLE_SCHEMA"), //
                     column("TABLE_NAME"), //
                     column("INDEX_TYPE_NAME"), //
+                    column("NULLS_DISTINCT"), //
                     column("IS_GENERATED", TypeInfo.TYPE_BOOLEAN), //
                     column("REMARKS"), //
                     column("INDEX_CLASS"), //
@@ -1758,7 +1758,7 @@ public final class InformationSchemaTable extends MetaTable {
             Constraint.Type constraintType, IndexColumn[] indexColumns, Table table, String tableName) {
         ConstraintUnique referenced;
         if (constraintType == Constraint.Type.REFERENTIAL) {
-            referenced = ((ConstraintReferential) constraint).getReferencedConstraint();
+            referenced = constraint.getReferencedConstraint();
         } else {
             referenced = null;
         }
@@ -2265,7 +2265,7 @@ public final class InformationSchemaTable extends MetaTable {
             enforced = true;
         } else {
             enforced = database.getReferentialIntegrity() && table.getCheckForeignKeyConstraints()
-                    && ((ConstraintReferential) constraint).getRefTable().getCheckForeignKeyConstraints();
+                    && constraint.getRefTable().getCheckForeignKeyConstraints();
         }
         add(session, rows,
                 // CONSTRAINT_CATALOG
@@ -2288,6 +2288,10 @@ public final class InformationSchemaTable extends MetaTable {
                 "NO",
                 // ENFORCED
                 enforced ? "YES" : "NO",
+                // NULLS_DISTINCT
+                constraintType == Constraint.Type.UNIQUE
+                        ? nullsDistinctToString(((ConstraintUnique) constraint).getNullsDistinct())
+                        : null,
                 // extensions
                 // INDEX_CATALOG
                 index != null ? catalog : null,
@@ -2619,6 +2623,7 @@ public final class InformationSchemaTable extends MetaTable {
 
     private void indexes(SessionLocal session, ArrayList<Row> rows, String catalog, Table table, String tableName,
             Index index) {
+        IndexType indexType = index.getIndexType();
         add(session, rows,
                 // INDEX_CATALOG
                 catalog,
@@ -2633,9 +2638,11 @@ public final class InformationSchemaTable extends MetaTable {
                 // TABLE_NAME
                 tableName,
                 // INDEX_TYPE_NAME
-                index.getIndexType().getSQL(),
+                indexType.getSQL(false),
+                // NULLS_DISTINCT
+                nullsDistinctToString(indexType.getNullsDistinct()),
                 // IS_GENERATED
-                ValueBoolean.get(index.getIndexType().getBelongsToConstraint()),
+                ValueBoolean.get(indexType.getBelongsToConstraint()),
                 // REMARKS
                 index.getComment(),
                 // INDEX_CLASS
@@ -2681,15 +2688,13 @@ public final class InformationSchemaTable extends MetaTable {
     private void inDoubt(SessionLocal session, ArrayList<Row> rows) {
         if (session.getUser().isAdmin()) {
             ArrayList<InDoubtTransaction> prepared = database.getInDoubtTransactions();
-            if (prepared != null) {
-                for (InDoubtTransaction prep : prepared) {
-                    add(session, rows,
-                            // TRANSACTION_NAME
-                            prep.getTransactionName(),
-                            // TRANSACTION_STATE
-                            prep.getStateDescription()
-                    );
-                }
+            for (InDoubtTransaction prep : prepared) {
+                add(session, rows,
+                        // TRANSACTION_NAME
+                        prep.getTransactionName(),
+                        // TRANSACTION_STATE
+                        prep.getStateDescription()
+                );
             }
         }
     }
@@ -2842,11 +2847,16 @@ public final class InformationSchemaTable extends MetaTable {
         NetworkConnectionInfo networkConnectionInfo = s.getNetworkConnectionInfo();
         Command command = s.getCurrentCommand();
         int blockingSessionId = s.getBlockingSessionId();
+        User user = s.getUser();
+        if (user == null) {
+            // Session was closed concurrently
+            return;
+        }
         add(session, rows,
                 // SESSION_ID
                 ValueInteger.get(s.getId()),
                 // USER_NAME
-                s.getUser().getName(),
+                user.getName(),
                 // SERVER
                 networkConnectionInfo == null ? null : networkConnectionInfo.getServer(),
                 // CLIENT_ADDR
@@ -2856,7 +2866,7 @@ public final class InformationSchemaTable extends MetaTable {
                 // SESSION_START
                 s.getSessionStart(),
                 // ISOLATION_LEVEL
-                session.getIsolationLevel().getSQL(),
+                s.getIsolationLevel().getSQL(),
                 // EXECUTING_STATEMENT
                 command == null ? null : command.toString(),
                 // EXECUTING_STATEMENT_START
@@ -2962,57 +2972,15 @@ public final class InformationSchemaTable extends MetaTable {
         add(session, rows, "OLD_INFORMATION_SCHEMA", session.isOldInformationSchema() ? "TRUE" : "FALSE");
         BitSet nonKeywords = session.getNonKeywords();
         if (nonKeywords != null) {
-            add(session, rows, "NON_KEYWORDS", Parser.formatNonKeywords(nonKeywords));
+            add(session, rows, "NON_KEYWORDS", ParserBase.formatNonKeywords(nonKeywords));
         }
         add(session, rows, "RETENTION_TIME", Integer.toString(database.getRetentionTime()));
+        add(session, rows, "WRITE_DELAY", Integer.toString(database.getWriteDelay()));
         // database settings
         for (Map.Entry<String, String> entry : database.getSettings().getSortedSettings()) {
             add(session, rows, entry.getKey(), entry.getValue());
         }
-        Store store = database.getStore();
-        MVStore mvStore = store.getMvStore();
-        FileStore fs = mvStore.getFileStore();
-        if (fs != null) {
-            add(session, rows,
-                    "info.FILE_WRITE", Long.toString(fs.getWriteCount()));
-            add(session, rows,
-                    "info.FILE_WRITE_BYTES", Long.toString(fs.getWriteBytes()));
-            add(session, rows,
-                    "info.FILE_READ", Long.toString(fs.getReadCount()));
-            add(session, rows,
-                    "info.FILE_READ_BYTES", Long.toString(fs.getReadBytes()));
-            add(session, rows,
-                    "info.UPDATE_FAILURE_PERCENT",
-                    String.format(Locale.ENGLISH, "%.2f%%", 100 * mvStore.getUpdateFailureRatio()));
-            add(session, rows,
-                    "info.FILL_RATE", Integer.toString(mvStore.getFillRate()));
-            add(session, rows,
-                    "info.CHUNKS_FILL_RATE", Integer.toString(mvStore.getChunksFillRate()));
-            add(session, rows,
-                    "info.CHUNKS_FILL_RATE_RW", Integer.toString(mvStore.getRewritableChunksFillRate()));
-            try {
-                add(session, rows,
-                        "info.FILE_SIZE", Long.toString(fs.getFile().size()));
-            } catch (IOException ignore) {/**/}
-            add(session, rows,
-                    "info.CHUNK_COUNT", Long.toString(mvStore.getChunkCount()));
-            add(session, rows,
-                    "info.PAGE_COUNT", Long.toString(mvStore.getPageCount()));
-            add(session, rows,
-                    "info.PAGE_COUNT_LIVE", Long.toString(mvStore.getLivePageCount()));
-            add(session, rows,
-                    "info.PAGE_SIZE", Integer.toString(mvStore.getPageSplitSize()));
-            add(session, rows,
-                    "info.CACHE_MAX_SIZE", Integer.toString(mvStore.getCacheSize()));
-            add(session, rows,
-                    "info.CACHE_SIZE", Integer.toString(mvStore.getCacheSizeUsed()));
-            add(session, rows,
-                    "info.CACHE_HIT_RATIO", Integer.toString(mvStore.getCacheHitRatio()));
-            add(session, rows, "info.TOC_CACHE_HIT_RATIO",
-                    Integer.toString(mvStore.getTocCacheHitRatio()));
-            add(session, rows,
-                    "info.LEAF_RATIO", Integer.toString(mvStore.getLeafRatio()));
-        }
+        database.getStore().getMvStore().populateInfo((name, value) -> add(session, rows, name, value));
     }
 
     private void synonyms(SessionLocal session, ArrayList<Row> rows, String catalog) {
@@ -3150,6 +3118,20 @@ public final class InformationSchemaTable extends MetaTable {
         }
     }
 
+    private static String nullsDistinctToString(NullsDistinct nullsDistinct) {
+        if (nullsDistinct != null) {
+            switch (nullsDistinct) {
+            case DISTINCT:
+                return "YES";
+            case ALL_DISTINCT:
+                return "ALL";
+            case NOT_DISTINCT:
+                return "NO";
+            }
+        }
+        return null;
+    }
+
     @Override
     public long getMaxDataModificationId() {
         switch (type) {
@@ -3194,10 +3176,7 @@ public final class InformationSchemaTable extends MetaTable {
             return session.getDatabase().getAllSchemas().size();
         case IN_DOUBT:
             if (session.getUser().isAdmin()) {
-                ArrayList<InDoubtTransaction> inDoubt = session.getDatabase().getInDoubtTransactions();
-                if (inDoubt != null) {
-                    return inDoubt.size();
-                }
+                return session.getDatabase().getInDoubtTransactions().size();
             }
             return 0L;
         case ROLES:

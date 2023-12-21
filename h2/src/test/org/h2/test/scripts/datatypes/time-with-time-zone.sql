@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -73,8 +73,11 @@ SELECT T8 FROM TEST;
 DROP TABLE TEST;
 > ok
 
+SET TIME ZONE 'UTC+10';
+> ok
+
 SELECT TIME WITH TIME ZONE '11:22:33';
-> exception INVALID_DATETIME_CONSTANT_2
+>> 11:22:33+10
 
 SELECT TIME WITH TIME ZONE '11:22:33 Europe/London';
 > exception INVALID_DATETIME_CONSTANT_2
@@ -96,3 +99,6 @@ SELECT TIME WITH TIME ZONE '23:00:00+01' - TIME WITH TIME ZONE '00:00:30-01';
 
 SELECT TIME WITH TIME ZONE '10:00:00-10' + INTERVAL '30' MINUTE;
 >> 10:30:00-10
+
+SET TIME ZONE LOCAL;
+> ok

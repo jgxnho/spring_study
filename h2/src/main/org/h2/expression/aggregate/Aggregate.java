@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -129,6 +129,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         addAggregate("VAR_SAMP", AggregateType.VAR_SAMP);
         addAggregate("VAR", AggregateType.VAR_SAMP);
         addAggregate("VARIANCE", AggregateType.VAR_SAMP);
+        addAggregate("ANY_VALUE", AggregateType.ANY_VALUE);
         addAggregate("ANY", AggregateType.ANY);
         addAggregate("SOME", AggregateType.ANY);
         // PostgreSQL compatibility
@@ -475,6 +476,11 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         case REGR_INTERCEPT:
         case REGR_R2:
             return new AggregateDataCorr(aggregateType);
+        case ANY_VALUE:
+            if (!distinct) {
+                return new AggregateDataAnyValue();
+            }
+            break;
         case LISTAGG: // NULL values are excluded by Aggregate
         case ARRAY_AGG:
             return new AggregateDataCollecting(distinct, orderByList != null, NullCollectionMode.USED_OR_IMPOSSIBLE);
@@ -590,6 +596,15 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
                     return ValueNull.INSTANCE;
                 }
                 return collect(session, c, new AggregateDataStdVar(aggregateType));
+            }
+            break;
+        case ANY_VALUE:
+            if (distinct) {
+                Value[] values = ((AggregateDataCollecting) data).getArray();
+                if (values == null) {
+                    return ValueNull.INSTANCE;
+                }
+                return values[session.getRandom().nextInt(values.length)];
             }
             break;
         case HISTOGRAM:
@@ -799,10 +814,15 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
     private StringBuilder getListaggError(Value[] array, String separator) {
         StringBuilder builder = new StringBuilder(getListaggItem(array[0]));
         for (int i = 1, count = array.length; i < count; i++) {
-            builder.append(separator).append(getListaggItem(array[i]));
-            if (builder.length() > Constants.MAX_STRING_LENGTH) {
-                throw DbException.getValueTooLongException("CHARACTER VARYING", builder.substring(0, 81), -1L);
+            String s = getListaggItem(array[i]);
+            long length = (long) builder.length() + separator.length() + s.length();
+            if (length > Constants.MAX_STRING_LENGTH) {
+                int limit = 81;
+                StringUtils.appendToLength(builder, separator, limit);
+                StringUtils.appendToLength(builder, s, limit);
+                throw DbException.getValueTooLongException("CHARACTER VARYING", builder.substring(0, limit), -1L);
             }
+            builder.append(separator).append(s);
         }
         return builder;
     }
@@ -813,17 +833,24 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         String[] strings = new String[count];
         String s = getListaggItem(array[0]);
         strings[0] = s;
-        final int estimatedLength = (int) Math.min(Integer.MAX_VALUE, s.length() * (long)count);
+        final int estimatedLength = (int) Math.min(Constants.MAX_STRING_LENGTH, s.length() * (long) count);
         final StringBuilder builder = new StringBuilder(estimatedLength);
         builder.append(s);
         loop: for (int i = 1; i < count; i++) {
-            builder.append(separator).append(strings[i] = s = getListaggItem(array[i]));
+            strings[i] = s = getListaggItem(array[i]);
             int length = builder.length();
-            if (length > Constants.MAX_STRING_LENGTH) {
+            long longLength = (long) length + separator.length() + s.length();
+            if (longLength > Constants.MAX_STRING_LENGTH) {
+                if (longLength - s.length() >= Constants.MAX_STRING_LENGTH) {
+                    i--;
+                } else {
+                    builder.append(separator);
+                    length = (int) longLength;
+                }
                 for (; i > 0; i--) {
                     length -= strings[i].length();
                     builder.setLength(length);
-                    builder.append(filter);
+                    StringUtils.appendToLength(builder, filter, Constants.MAX_STRING_LENGTH + 1);
                     if (!withoutCount) {
                         builder.append('(').append(count - i).append(')');
                     }
@@ -836,6 +863,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
                 builder.append(filter).append('(').append(count).append(')');
                 break;
             }
+            builder.append(separator).append(s);
         }
         return builder;
     }
@@ -988,6 +1016,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
             break;
         case MIN:
         case MAX:
+        case ANY_VALUE:
             break;
         case STDDEV_POP:
         case STDDEV_SAMP:
@@ -1207,15 +1236,15 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         }
         args[0].getUnenclosedSQL(builder, sqlFlags);
         ListaggArguments arguments = (ListaggArguments) extraArguments;
-        String s = arguments.getSeparator();
-        if (s != null) {
-            StringUtils.quoteStringSQL(builder.append(", "), s);
+        Expression e = arguments.getSeparator();
+        if (e != null) {
+            e.getUnenclosedSQL(builder.append(", "), sqlFlags);
         }
         if (arguments.getOnOverflowTruncate()) {
             builder.append(" ON OVERFLOW TRUNCATE ");
-            s = arguments.getFilter();
-            if (s != null) {
-                StringUtils.quoteStringSQL(builder, s).append(' ');
+            e = arguments.getFilter();
+            if (e != null) {
+                e.getUnenclosedSQL(builder, sqlFlags).append(' ');
             }
             builder.append(arguments.isWithoutCount() ? "WITHOUT" : "WITH").append(" COUNT");
         }
@@ -1268,7 +1297,8 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         if (filterCondition != null && !filterCondition.isEverything(visitor)) {
             return false;
         }
-        if (visitor.getType() == ExpressionVisitor.OPTIMIZABLE_AGGREGATE) {
+        switch (visitor.getType()) {
+        case ExpressionVisitor.OPTIMIZABLE_AGGREGATE:
             switch (aggregateType) {
             case COUNT:
                 if (distinct || args[0].getNullable() != Column.NOT_NULLABLE) {
@@ -1292,6 +1322,10 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
             case ENVELOPE:
                 return AggregateDataEnvelope.getGeometryColumnIndex(args[0]) != null;
             default:
+                return false;
+            }
+        case ExpressionVisitor.DETERMINISTIC:
+            if (aggregateType == AggregateType.ANY_VALUE) {
                 return false;
             }
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -100,6 +100,25 @@ public abstract class ValueCollectionBase extends Value {
             }
         }
         return false;
+    }
+
+    @Override
+    Value getValueWithFirstNullImpl(Value v) {
+        ValueCollectionBase r = (ValueCollectionBase) v;
+        Value[] leftArray = values, rightArray = r.values;
+        int leftLength = leftArray.length, rightLength = rightArray.length;
+        int len = Math.min(leftLength, rightLength);
+        for (int i = 0; i < len; i++) {
+            Value v1 = leftArray[i];
+            Value v2 = rightArray[i];
+            Value c = v1.getValueWithFirstNull(v2);
+            if (c == v1) {
+                return this;
+            } else if (c == v2) {
+                return v;
+            }
+        }
+        return null;
     }
 
     @Override

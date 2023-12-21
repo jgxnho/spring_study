@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -162,7 +162,8 @@ public class TestScript extends TestDb {
                 "merge", "mergeUsing", "replace", "script", "show", "update", "with" }) {
             testScript("dml/" + s + ".sql");
         }
-        for (String s : new String[] { "any", "array_agg", "avg", "bit_and_agg", "bit_or_agg", "bit_xor_agg",
+        for (String s : new String[] { "any_value", "any", "array_agg", "avg",
+                "bit_and_agg", "bit_or_agg", "bit_xor_agg",
                 "corr",
                 "count",
                 "covar_pop", "covar_samp",
@@ -187,7 +188,7 @@ public class TestScript extends TestDb {
             testScript("functions/numeric/" + s + ".sql");
         }
         for (String s : new String[] { "array-to-string",
-                "ascii", "bit-length", "char", "concat",
+                "ascii", "bit-length", "btrim", "char", "concat",
                 "concat-ws", "difference", "hextoraw", "insert",
                 "left", "length", "locate", "lower", "lpad", "ltrim",
                 "octet-length", "quote_ident", "rawtohex", "regexp-like",
@@ -213,7 +214,7 @@ public class TestScript extends TestDb {
         for (String s : new String[] { "current_date", "current_timestamp",
                 "current-time", "dateadd", "datediff", "dayname",
                 "day-of-month", "day-of-week", "day-of-year", "extract",
-                "formatdatetime", "hour", "minute", "month", "monthname",
+                "formatdatetime", "hour", "last_day", "minute", "month", "monthname",
                 "parsedatetime", "quarter", "second", "truncate", "week", "year", "date_trunc" }) {
             testScript("functions/timeanddate/" + s + ".sql");
         }
@@ -227,7 +228,8 @@ public class TestScript extends TestDb {
         for (String s : new String[] { "comments", "identifiers" }) {
             testScript("parser/" + s + ".sql");
         }
-        for (String s : new String[] { "between", "distinct", "in", "like", "null", "type", "unique" }) {
+        for (String s : new String[] { "between", "distinct", "in", "like", "null", "quantified-comparison-with-array",
+                "type", "unique" }) {
             testScript("predicates/" + s + ".sql");
         }
         for (String s : new String[] { "derived-column-names", "distinct", "joins", "query-optimisations", "select",

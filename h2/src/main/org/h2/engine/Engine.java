@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -235,7 +235,8 @@ public final class Engine {
                 throw DbException.get(ErrorCode.DATABASE_CALLED_AT_SHUTDOWN);
             }
         }
-        synchronized (session) {
+        session.lock();
+        try {
             session.setAllowLiterals(true);
             DbSettings defaultSettings = DbSettings.DEFAULT;
             for (String setting : ci.getKeys()) {
@@ -286,6 +287,8 @@ public final class Engine {
             }
             session.setAllowLiterals(false);
             session.commit(true);
+        } finally {
+            session.unlock();
         }
         return session;
     }

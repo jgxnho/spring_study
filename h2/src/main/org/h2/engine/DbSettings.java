@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -87,13 +87,6 @@ public class DbSettings extends SettingsBase {
      * case insensitive. Setting this to "true" is experimental.
      */
     public final boolean caseInsensitiveIdentifiers = get("CASE_INSENSITIVE_IDENTIFIERS", false);
-
-    /**
-     * Database setting <code>DB_CLOSE_ON_EXIT</code> (default: true).
-     * Close the database when the virtual machine exits normally, using a
-     * shutdown hook.
-     */
-    public final boolean dbCloseOnExit = get("DB_CLOSE_ON_EXIT", true);
 
     /**
      * Database setting <code>DEFAULT_CONNECTION</code> (default: false).

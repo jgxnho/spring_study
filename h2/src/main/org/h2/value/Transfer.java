@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.Map.Entry;
 
 import org.h2.api.ErrorCode;
@@ -139,6 +140,8 @@ public final class Transfer {
         TI_TO_VALUE[typeInformationType + 1] = valueType;
     }
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
@@ -159,18 +162,48 @@ public final class Transfer {
     }
 
     /**
+     * Locks this object with a reentrant lock.
+     *
+     * <pre>
+     * lock();
+     * try {
+     *     ...
+     * } finally {
+     *     unlock();
+     * }
+     * </pre>
+     */
+    private void lock() {
+        lock.lock();
+    }
+
+    /**
+     * Unlocks this object.
+     *
+     * @see #lock()
+     */
+    private void unlock() {
+        lock.unlock();
+    }
+
+    /**
      * Initialize the transfer object. This method will try to open an input and
      * output stream.
      * @throws IOException on failure
      */
-    public synchronized void init() throws IOException {
-        if (socket != null) {
-            in = new DataInputStream(
-                    new BufferedInputStream(
-                            socket.getInputStream(), Transfer.BUFFER_SIZE));
-            out = new DataOutputStream(
-                    new BufferedOutputStream(
-                            socket.getOutputStream(), Transfer.BUFFER_SIZE));
+    public void init() throws IOException {
+        lock();
+        try {
+            if (socket != null) {
+                in = new DataInputStream(
+                        new BufferedInputStream(
+                                socket.getInputStream(), Transfer.BUFFER_SIZE));
+                out = new DataOutputStream(
+                        new BufferedOutputStream(
+                                socket.getOutputStream(), Transfer.BUFFER_SIZE));
+            }
+        } finally {
+            unlock();
         }
     }
 
@@ -434,18 +467,23 @@ public final class Transfer {
     /**
      * Close the transfer object and the socket.
      */
-    public synchronized void close() {
-        if (socket != null) {
-            try {
-                if (out != null) {
-                    out.flush();
+    public void close() {
+        lock();
+        try {
+            if (socket != null) {
+                try {
+                    if (out != null) {
+                        out.flush();
+                    }
+                    socket.close();
+                } catch (IOException e) {
+                    DbException.traceThrowable(e);
+                } finally {
+                    socket = null;
                 }
-                socket.close();
-            } catch (IOException e) {
-                DbException.traceThrowable(e);
-            } finally {
-                socket = null;
             }
+        } finally {
+            unlock();
         }
     }
 
@@ -1285,8 +1323,13 @@ public final class Transfer {
         return version;
     }
 
-    public synchronized boolean isClosed() {
-        return socket == null || socket.isClosed();
+    public boolean isClosed() {
+        lock();
+        try {
+            return socket == null || socket.isClosed();
+        } finally {
+            unlock();
+        }
     }
 
     /**

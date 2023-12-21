@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -358,3 +358,15 @@ SELECT CAST(ARRAY[JSON '[]', JSON '{}'] AS JSON);
 
 SELECT CAST(ARRAY[1, 2] AS JSON);
 >> [1,2]
+
+SELECT JSON '[0, 1, 2, 3]'[2];
+>> 1
+
+SELECT JSON '[[1, 2], [3, 4]]'[2][1];
+>> 3
+
+SELECT JSON '[0, 1]'[3];
+>> null
+
+SELECT JSON '{"a": 8}'[1];
+>> null

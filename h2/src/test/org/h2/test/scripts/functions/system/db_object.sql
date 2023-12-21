@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -235,7 +235,7 @@ SELECT T, ID_A <> ID_B, SQL_A, SQL_B FROM (VALUES
 > T          ID_A <> ID_B SQL_A                                                                                                                           SQL_B
 > ---------- ------------ ------------------------------------------------------------------------------------------------------------------------------- -------------------------------------------------------------------------------------------------------------------------------
 > CONSTRAINT TRUE         ALTER TABLE "PUBLIC"."T_A" ADD CONSTRAINT "PUBLIC"."C_A" UNIQUE("ID")                                                           ALTER TABLE "PUBLIC"."T_B" ADD CONSTRAINT "PUBLIC"."C_B" UNIQUE("ID")
-> INDEX      TRUE         CREATE UNIQUE INDEX "PUBLIC"."I_A" ON "PUBLIC"."T_A"("ID" NULLS FIRST)                                                          CREATE UNIQUE INDEX "PUBLIC"."I_B" ON "PUBLIC"."T_B"("ID" NULLS FIRST)
+> INDEX      TRUE         CREATE UNIQUE NULLS DISTINCT INDEX "PUBLIC"."I_A" ON "PUBLIC"."T_A"("ID" NULLS FIRST)                                           CREATE UNIQUE NULLS DISTINCT INDEX "PUBLIC"."I_B" ON "PUBLIC"."T_B"("ID" NULLS FIRST)
 > SYNONYM    TRUE         CREATE SYNONYM "PUBLIC"."S_A" FOR "PUBLIC"."T_A"                                                                                CREATE SYNONYM "PUBLIC"."S_B" FOR "PUBLIC"."T_B"
 > TABLE      TRUE         CREATE MEMORY TABLE "PUBLIC"."T_A"( "ID" INTEGER )                                                                              CREATE MEMORY TABLE "PUBLIC"."T_B"( "ID" INTEGER )
 > TRIGGER    TRUE         CREATE FORCE TRIGGER "PUBLIC"."G_A" BEFORE INSERT ON "PUBLIC"."T_A" FOR EACH ROW QUEUE 1024 CALL 'org.h2.test.scripts.Trigger1' CREATE FORCE TRIGGER "PUBLIC"."G_B" BEFORE INSERT ON "PUBLIC"."T_B" FOR EACH ROW QUEUE 1024 CALL 'org.h2.test.scripts.Trigger1'

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -118,15 +118,27 @@ public class TestTools extends TestDb {
     }
 
     private void testTcpServerWithoutPort() throws Exception {
-        Server s1 = Server.createTcpServer().start();
-        Server s2 = Server.createTcpServer().start();
-        assertTrue(s1.getPort() != s2.getPort());
-        s1.stop();
-        s2.stop();
-        s1 = Server.createTcpServer("-tcpPort", "9123").start();
-        assertEquals(9123, s1.getPort());
-        assertThrows(ErrorCode.EXCEPTION_OPENING_PORT_2, () -> Server.createTcpServer("-tcpPort", "9123").start());
-        s1.stop();
+        Server s1 = null;
+        try {
+            s1 = Server.createTcpServer().start();
+            Server s2 = null;
+            try {
+                s2 = Server.createTcpServer().start();
+                assertTrue(s1.getPort() != s2.getPort());
+            } finally {
+                if (s2 != null) s2.stop();
+            }
+        } finally {
+            if (s1 != null) s1.stop();
+        }
+
+        try {
+            s1 = Server.createTcpServer("-tcpPort", "9123").start();
+            assertEquals(9123, s1.getPort());
+            assertThrows(ErrorCode.EXCEPTION_OPENING_PORT_2, () -> Server.createTcpServer("-tcpPort", "9123").start());
+        } finally {
+            if (s1 != null) s1.stop();
+        }
     }
 
     private void testConsole() throws Exception {

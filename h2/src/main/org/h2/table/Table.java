@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -100,6 +100,10 @@ public abstract class Table extends SchemaObject {
      * views that depend on this table
      */
     private final CopyOnWriteArrayList<TableView> dependentViews = new CopyOnWriteArrayList<>();
+    /**
+     * materialized views that depend on this table
+     */
+    private final CopyOnWriteArrayList<MaterializedView> dependentMaterializedViews = new CopyOnWriteArrayList<>();
     private ArrayList<TableSynonym> synonyms;
     /** Is foreign key constraint checking enabled for this table. */
     private boolean checkForeignKeyConstraints = true;
@@ -208,9 +212,12 @@ public abstract class Table extends SchemaObject {
      *
      * @param session the session
      * @param row to lock
-     * @return locked row, or null if row does not exist anymore
+     * @param timeoutMillis
+     *            timeout in milliseconds, {@code -1} for default, {@code -2} to
+     *            skip locking if row is already locked by another session
+     * @return locked row, or null if row does not exist anymore or if it was skipped
      */
-    public Row lockRow(SessionLocal session, Row row) {
+    public Row lockRow(SessionLocal session, Row row, int timeoutMillis) {
         throw DbException.getUnsupportedException("lockRow()");
     }
 
@@ -575,11 +582,14 @@ public abstract class Table extends SchemaObject {
         return dependentViews;
     }
 
+    public CopyOnWriteArrayList<MaterializedView> getDependentMaterializedViews() {
+        return dependentMaterializedViews;
+    }
+
     @Override
     public void removeChildrenAndResources(SessionLocal session) {
         while (!dependentViews.isEmpty()) {
-            TableView view = dependentViews.get(0);
-            dependentViews.remove(0);
+            TableView view = dependentViews.remove(0);
             database.removeSchemaObject(session, view);
         }
         while (synonyms != null && !synonyms.isEmpty()) {
@@ -1013,6 +1023,15 @@ public abstract class Table extends SchemaObject {
     }
 
     /**
+     * Remove the given view from the dependent views list.
+     *
+     * @param view the view to remove
+     */
+    public void removeDependentMaterializedView(MaterializedView view) {
+        dependentMaterializedViews.remove(view);
+    }
+
+    /**
      * Remove the given view from the list.
      *
      * @param synonym the synonym to remove
@@ -1055,6 +1074,15 @@ public abstract class Table extends SchemaObject {
      */
     public void addDependentView(TableView view) {
         dependentViews.add(view);
+    }
+
+    /**
+     * Add a materialized view to this table.
+     *
+     * @param view the view to add
+     */
+    public void addDependentMaterializedView(MaterializedView view) {
+        this.dependentMaterializedViews.add(view);
     }
 
     /**

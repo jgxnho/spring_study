@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -65,3 +65,16 @@ SELECT X, X IN(SELECT * FROM UNNEST(ARRAY[2, 4])) FROM SYSTEM_RANGE(1, 5);
 > 4 TRUE
 > 5 FALSE
 > rows: 5
+
+SELECT V FROM (UNNEST(JSON '[1, "2", 3]') WITH ORDINALITY) T(V, N) ORDER BY N;
+> V
+> ---
+> 1
+> "2"
+> 3
+> rows (ordered): 3
+
+SELECT * FROM (UNNEST(JSON 'null'));
+> C1
+> --
+> rows: 0

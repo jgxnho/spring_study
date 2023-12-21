@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+ * Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
  * and the EPL 1.0 (https://h2database.com/html/license.html).
  * Initial Developer: H2 Group
  */
@@ -515,14 +515,20 @@ public final class Sequence extends SchemaObject {
             // This session may not lock the sys table (except if it has already
             // locked it) because it must be committed immediately, otherwise
             // other threads can not access the sys table.
-            SessionLocal sysSession = database.getSystemSession();
-            synchronized (sysSession) {
+            final SessionLocal sysSession = database.getSystemSession();
+            sysSession.lock();
+            try {
                 flushInternal(sysSession);
                 sysSession.commit(false);
+            } finally {
+                sysSession.unlock();
             }
         } else {
-            synchronized (session) {
+            session.lock();
+            try {
                 flushInternal(session);
+            } finally {
+                session.unlock();
             }
         }
     }

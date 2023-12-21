@@ -1,4 +1,4 @@
--- Copyright 2004-2022 H2 Group. Multiple-Licensed under the MPL 2.0,
+-- Copyright 2004-2023 H2 Group. Multiple-Licensed under the MPL 2.0,
 -- and the EPL 1.0 (https://h2database.com/html/license.html).
 -- Initial Developer: H2 Group
 --
@@ -206,3 +206,36 @@ DROP TABLE TEST;
 
 SET MODE Regular;
 > ok
+
+CREATE TABLE TEST(A NUMERIC(100000), B NUMERIC(100)) AS VALUES (1E99999, 1E99);
+> ok
+
+SELECT CHAR_LENGTH(CAST(A / B AS VARCHAR)) FROM TEST;
+>> 99901
+
+SELECT CHAR_LENGTH(CAST(A / CAST(B AS NUMERIC(200, 100)) AS VARCHAR)) FROM TEST;
+>> 99901
+
+DROP TABLE TEST;
+> ok
+
+SELECT 111_222_333_444_555_666_777_888_999, 111_222_333_444_555_666_777.333_444, 123_456., .333, 345_323.765_329, 1.;
+> 111222333444555666777888999 111222333444555666777.333444 123456 0.333 345323.765329 1
+> --------------------------- ---------------------------- ------ ----- ------------- -
+> 111222333444555666777888999 111222333444555666777.333444 123456 0.333 345323.765329 1
+> rows: 1
+
+SELECT 1_.;
+> exception SYNTAX_ERROR_2
+
+SELECT 1_1._1;
+> exception SYNTAX_ERROR_2
+
+SELECT 9_9.9_;
+> exception SYNTAX_ERROR_2
+
+SELECT 132_134.3__3;
+> exception SYNTAX_ERROR_2
+
+SELECT 111_222_333_444_555_666__777;
+> exception SYNTAX_ERROR_2
